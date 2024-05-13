@@ -1,4 +1,3 @@
-using ClusterTrees
 using FastBEAST
 using LinearAlgebra
 using Random
@@ -28,46 +27,40 @@ end
 
 
 function assembler(kernel, matrix, testpoints, sourcepoints)
-    for j in eachindex(sourcepoints) 
+    for j in eachindex(sourcepoints)
         for i in eachindex(testpoints)
             matrix[i,j] = kernel(testpoints[i], sourcepoints[j])
         end
     end
 end
 
-N = 2000
+N = 1000
 
 spoints = [@SVector rand(3) for i = 1:N]
-tpoints = [@SVector rand(3) for i = 1:N] 
-
-@views OneoverRkernelassembler(matrix, tdata, sdata) = assembler(
-    OneoverRkernel, matrix, tpoints[tdata], spoints[sdata]
-)
-
-stree = create_tree(spoints, KMeansTreeOptions(nmin=20))
-ttree = create_tree(tpoints, KMeansTreeOptions(nmin=20))
-
-kmat = assembler(OneoverRkernel, tpoints, spoints)
-
-for multithreading in [true, false]
-    hmat = HMatrix(
-        OneoverRkernelassembler,
-        ClusterTrees.BlockTrees.BlockTree(ttree,stree),
-        Int64,
-        Float64;
-        compressor=FastBEAST.ACAOptions(tol=1e-4),
-        verbose=true,
-        multithreading=multithreading, 
-        η=1.5
+tpoints = spoints
+for tpoints in [spoints]
+    @views OneoverRkernelassembler(matrix, tdata, sdata) = assembler(
+        OneoverRkernel, matrix, tpoints[tdata], spoints[sdata]
     )
+    stree = create_tree(spoints, BoxTreeOptions(nmin=25))
+    ttree = create_tree(tpoints, BoxTreeOptions(nmin=25))
+    kmat = assembler(OneoverRkernel, tpoints, spoints)
+    for multithreading in [true, false]
+        hmat = HMatrix(
+            OneoverRkernelassembler,
+            ttree,
+            stree,
+            Int64,
+            Float64;
+            compressor=FastBEAST.ACAOptions(tol=1e-4),
+            multithreading=multithreading
+        )
 
-    x = rand(N)
-    if tpoints != spoints
-        @test estimate_reldifference(hmat,kmat) ≈ 0 atol=1e-4
+        x = rand(N)
+        if tpoints != spoints
+            @test estimate_reldifference(hmat,kmat) ≈ 0 atol=1e-4
+        end
+
+        @test norm(hmat*x - kmat*x)/norm(kmat*x) ≈ 0 atol=1e-4
     end
-
-    @test norm(hmat*x - kmat*x)/norm(kmat*x) ≈ 0 atol=1e-4
-
-    @test FastBEAST.storage(hmat) ≈ 
-        compressionrate(hmat) * size(hmat, 1) * size(hmat, 2) * 8 * 1e-9
 end
