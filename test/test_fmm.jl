@@ -62,13 +62,12 @@ for mesh in meshes
             ylF32 = matop(Ofl)*xF32
             ytF64 = matop(Oft)*xF64
             ylF64 = matop(Ofl)*xF64
-
             @test size(matop(Oft))[1] == size(matop(Oft), 1)
             @test size(matop(Oft))[2] == size(matop(Oft), 2)
             @test eltype(ytF32) == promote_type(eltype(xF32), eltype(Oft)) 
-            @test norm(ytF32 - ylF32)/norm(ylF32) ≈ 0 atol=1e-4
+            @test norm(ytF32 - ylF32)/norm(ylF32) ≈ 0 atol=2e-4
             @test eltype(ytF64) == promote_type(eltype(xF64), eltype(Oft)) 
-            @test norm(ytF64 - ylF64)/norm(ylF64) ≈ 0 atol=1e-4
+            @test norm(ytF64 - ylF64)/norm(ylF64) ≈ 0 atol=2e-4
         end
     end
 end

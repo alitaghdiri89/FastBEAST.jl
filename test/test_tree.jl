@@ -1,35 +1,28 @@
 using FastBEAST
-using LinearAlgebra
+using ClusterTrees
 using StaticArrays
 using Test
 
 #BoxTree
-points2D = [SVector(1.0, 1.0), #3
-            SVector(2.0, 2.0), #1
-            SVector(1.2, 1.7), #2
-            SVector(1.7, 1.2), #4
-            SVector(1.21, 1.7)] #2
+points = [SVector(1.0, 1.0, 1.0), SVector(0.5, 0.5, 0.5)]
 
-root = create_tree(points2D, BoxTreeOptions())
-
-@test length(root.children) == 4
-@test FastBEAST.indices(root.children[1])[1] == 2
-@test FastBEAST.indices(root.children[2])[1] == 3
-@test FastBEAST.indices(root.children[2])[2] == 5
-@test FastBEAST.indices(root.children[3])[1] == 1
-@test FastBEAST.indices(root.children[4])[1] == 4
+tree = create_tree(points, FastBEAST.KMeansTreeOptions())
+nears, fars = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree))
+@test length(fars[2]) == 2
+##
 
 # KMeansTree
-points2D = [SVector(0.1, 0.1), #1
-            SVector(1.0, 1.0), #2
-            SVector(0.2, 0.2), #3
-            SVector(1.1, 1.1)] #4
+points = [@SVector rand(3) for i = 1:1000]
 
-root = create_tree(points2D, KMeansTreeOptions(algorithm=:naive))
+tree = create_tree(points, FastBEAST.KMeansTreeOptions(nmin=5))
+nears_strong, fars_strong = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=1.0)
+nears_weak, fars_weak = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=2.0)
 
-@test length(root.children) == 2
-@test FastBEAST.indices(root.children[1])[1] == 1
-@test FastBEAST.indices(root.children[1])[2] == 3
-@test FastBEAST.indices(root.children[2])[1] == 2
-@test FastBEAST.indices(root.children[2])[2] == 4
-@test root.children[1].radius ≈ norm([0.05 0.05]) atol=1e-15
+@test length(fars_weak[6]) > length(fars_strong[6])
+
+tree = create_tree(points, FastBEAST.BoxTreeOptions(nmin=5))
+nears_strong, fars_strong = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=1.0)
+nears_weak, fars_weak = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=2.0)
+@test length(fars_weak[3]) > length(fars_strong[3])
+
+

@@ -1,6 +1,11 @@
 module FastBEAST
 using LinearAlgebra
-include("tree/tree.jl")
+
+include("../ext/NminClusterTrees/NminClusterTrees.jl")
+
+include("clustertree/tree.jl")
+include("clustertree/kmeanstree.jl")
+include("clustertree/boxtree.jl")
 
 include("aca/aca_utils.jl")
 include("aca/pivoting.jl")
@@ -13,17 +18,11 @@ include("fmm.jl")
 include("beast.jl")
 include("fmm/operators/FMMoperator.jl")
 
-export BoundingBox
-export getboxframe
-export getchildbox
-export whichchildbox
-
-export BoxTreeNode
-export create_tree
-export BoxTreeOptions
-export ExaFMMOptions
 export KMeansTreeOptions
-export KMeansTreeNode
+export BoxTreeOptions
+export create_tree
+export computeinteractions
+export value
 
 export aca, allocate_aca_memory
 export LazyMatrix
