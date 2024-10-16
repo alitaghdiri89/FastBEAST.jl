@@ -10,7 +10,6 @@ using Test
 k = 2 * π / λ
 
 Γs = meshrectangle(1.0,1.0, 0.3)
-Γt = translate(meshrectangle(1.0,1.0, 0.3), SVector(3.0, 0.0, 1.0))
 
 meshes = [
     (Γs, translate(Γs, SVector(3.0, 0.0, 1.0))),
@@ -27,7 +26,7 @@ for mesh in meshes
             SL, 
             Y,
             X;
-            treeoptions=BoxTreeOptions(nmin=100),
+            treeoptions=BoxTreeOptions(nmin=20),
             compressor=FastBEAST.ACAOptions(tol=1e-4),
             multithreading= multithreading
         )

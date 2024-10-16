@@ -5,6 +5,7 @@ version = "0.1.1"
 
 [deps]
 BEAST = "bb4162c7-ba94-5a20-af32-d8ec4428bdd1"
+ClusterTrees = "5100927d-02aa-593a-b4f9-7235df19f0db"
 CompScienceMeshes = "3e66a162-7b8c-5da0-b8f8-124ecd2c3ae1"
 ExaFMMt = "add1291b-d076-47cc-8667-64576de04ee0"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
