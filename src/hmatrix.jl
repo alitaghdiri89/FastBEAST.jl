@@ -202,33 +202,24 @@ end
 
 function HMatrix(
     matrixassembler::Function,
-    testtree::T,#::BoxTreeNode,
-    sourcetree::T,#::BoxTreeNode,
+    tree::ClusterTrees.BlockTrees.BlockTree{T},
     ::Type{I},
     ::Type{K};
     farmatrixassembler=matrixassembler,
     compressor=ACAOptions(),
     multithreading=false,
-    verbose=false
-) where {I, K, T <: AbstractNode}
+    verbose=false,
+    η=0.5
+) where {I, K, T}
     
-    fullinteractions = SVector{2}[]
-    compressableinteractions = SVector{2}[]
     fullcompressableinteractions = SVector{2}[]
-    
-    computerinteractions!(
-        testtree,
-        sourcetree,
-        fullinteractions,
-        compressableinteractions
-    )
-
+    fullinteractions, compressableinteractions = computeinteractions(tree, η=η)
     MBF = MatrixBlock{I, K, Matrix{K}}
     fullrankblocks_perthread = Vector{MBF}[]
     fullrankblocks = MBF[]
 
-    rowdim = numindices(testtree)
-    coldim = numindices(sourcetree)
+    rowdim = length(value(tree.test_cluster, 1))
+    coldim = length(value(tree.trial_cluster, 1))
 
     if !multithreading
         am = allocate_aca_memory(K, rowdim, coldim, maxrank=compressor.maxrank)
@@ -238,8 +229,7 @@ function HMatrix(
             push!(ams, allocate_aca_memory(K, rowdim, coldim, maxrank=compressor.maxrank))
         end
     end
-    nonzeros_perthread = I[]
-    nonzeros = 0
+
     verbose && println("Number of full interactions: ", length(fullinteractions))
     verbose && println(
         "Number of compressable interactions: ",
@@ -252,13 +242,12 @@ function HMatrix(
 
     if !multithreading
         for fullinteraction in fullinteractions
-            nonzeros += numindices(fullinteraction[1])*numindices(fullinteraction[2])
             push!(
                 fullrankblocks,
                 getfullmatrixview(
                     matrixassembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     I,
                     K
                 )
@@ -268,18 +257,15 @@ function HMatrix(
     elseif multithreading
         for i in 1:Threads.nthreads()
             push!(fullrankblocks_perthread, MBF[])
-            push!(nonzeros_perthread, 0)
         end
 
         Threads.@threads for fullinteraction in fullinteractions
-            nonzeros_perthread[Threads.threadid()] += 
-                numindices(fullinteraction[1])*numindices(fullinteraction[2])
             push!(
                 fullrankblocks_perthread[Threads.threadid()],
                 getfullmatrixview(
                     matrixassembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     I,
                     K
                 )
@@ -301,43 +287,46 @@ function HMatrix(
     end
 
     if !multithreading
-        for compressableinteraction in compressableinteractions
-            push!(
-                lowrankblocks, 
-                getcompressedmatrix(
-                    farmatrixassembler,
-                    compressableinteraction[1],
-                    compressableinteraction[2],
-                    I,
-                    K,
-                    am,
-                    compressor=compressor
+        for level in compressableinteractions
+            for compressableinteraction in level
+                push!(
+                    lowrankblocks, 
+                    getcompressedmatrix(
+                        farmatrixassembler,
+                        value(tree.test_cluster, compressableinteraction[1]),
+                        value(tree.trial_cluster, compressableinteraction[2]),
+                        I,
+                        K,
+                        am,
+                        compressor=compressor
+                    )
                 )
-            )
-            nonzeros += nnzs(lowrankblocks[end])
-            verbose && next!(p)
+                #nonzeros += nnzs(lowrankblocks[end])
+                verbose && next!(p)
+            end
         end
     elseif multithreading
         for i in 1:Threads.nthreads()
             push!(lowrankblocks_perthread, MBL[])
         end
-
-        Threads.@threads for compressableinteraction in compressableinteractions
-            push!(
-                lowrankblocks_perthread[Threads.threadid()],
-                getcompressedmatrix(
-                    farmatrixassembler,
-                    compressableinteraction[1],
-                    compressableinteraction[2],
-                    I,
-                    K,
-                    ams[Threads.threadid()],
-                    compressor=compressor
+        for level in compressableinteractions
+            Threads.@threads for compressableinteraction in level
+                push!(
+                    lowrankblocks_perthread[Threads.threadid()],
+                    getcompressedmatrix(
+                        farmatrixassembler,
+                        value(tree.test_cluster, compressableinteraction[1]),
+                        value(tree.trial_cluster, compressableinteraction[2]),
+                        I,
+                        K,
+                        ams[Threads.threadid()],
+                        compressor=compressor
+                    )
                 )
-            )
-            nonzeros_perthread[Threads.threadid()] += 
-                nnzs(lowrankblocks_perthread[Threads.threadid()][end])
-            verbose && next!(p)
+                #nonzeros_perthread[Threads.threadid()] += 
+                #    nnzs(lowrankblocks_perthread[Threads.threadid()][end])
+                verbose && next!(p)
+            end
         end
 
         for i in eachindex(lowrankblocks_perthread)
@@ -408,97 +397,27 @@ function HMatrix(
         lowrankblocks,
         rowdim,
         coldim,
-        nonzeros + sum(nonzeros_perthread),
+        0,
         compressor.maxrank,
         multithreading
     )
 end
 
-function computerinteractions!(
-    testnode::T,
-    sourcenode::T,
-    fullinteractions::Vector{SVector{2}},
-    compressableinteractions::Vector{SVector{2}}
-) where T <: AbstractNode
-    if iscompressable(sourcenode, testnode)
-        if level(sourcenode) == 0 && level(testnode) == 0
-            push!(compressableinteractions, SVector(testnode, sourcenode))
-            return
-        else
-            error("We do not expect this behavior")
-        end
-    end
-
-    if !haschildren(sourcenode) && !haschildren(testnode)
-        push!(fullinteractions, SVector(testnode, sourcenode))
-        return
-    else
-        if !haschildren(sourcenode)
-            schild = sourcenode
-            for tchild in children(testnode)
-                decide_compression(
-                    tchild, 
-                    schild, 
-                    fullinteractions, 
-                    compressableinteractions
-                )
-            end
-        elseif !haschildren(testnode)
-            tchild = testnode
-            for schild in children(sourcenode)
-                decide_compression(
-                    tchild, 
-                    schild, 
-                    fullinteractions, 
-                    compressableinteractions
-                )
-            end
-        else
-            for schild in children(sourcenode)
-                for tchild in children(testnode)
-                    decide_compression(
-                        tchild, 
-                        schild, 
-                        fullinteractions, 
-                        compressableinteractions
-                    )
-                end
-            end
-        end
-    end
-end
-
-function decide_compression(ttchild, sschild, fullinteractions, compressableinteractions)
-    if numindices(ttchild) > 0 && numindices(sschild) > 0
-        if iscompressable(ttchild, sschild)
-            push!(compressableinteractions, SVector(ttchild, sschild))
-
-            return
-        else
-            computerinteractions!(
-                ttchild,
-                sschild,
-                fullinteractions,
-                compressableinteractions
-            )
-        end
-    end
-end
 
 function getfullmatrixview(
     matrixassembler,
-    testnode,
-    sourcenode,
+    testidcs,
+    trialidcs,
     ::Type{I},
     ::Type{K};
 ) where {I, K}
-    matrix = zeros(K, numindices(testnode), numindices(sourcenode))
-    matrixassembler(matrix, indices(testnode), indices(sourcenode))
+    matrix = zeros(K, length(testidcs), length(trialidcs))
+    matrixassembler(matrix, testidcs, trialidcs)
 
     return MatrixBlock{I, K, Matrix{K}}(
         matrix,
-        indices(testnode),
-        indices(sourcenode)
+        testidcs,
+        trialidcs
     )
 end
 
@@ -521,15 +440,15 @@ end
 
 function getcompressedmatrix(
     matrixassembler::Function,
-    testnode,
-    sourcenode,
+    testidcs,
+    trialidcs,
     ::Type{I},
     ::Type{K},
     am;
     compressor=ACAOptions()
 ) where {I, K}
 
-        lm = LazyMatrix(matrixassembler, indices(testnode), indices(sourcenode), K)
+        lm = LazyMatrix(matrixassembler, testidcs, trialidcs, K)
 
         maxrank = compressor.maxrank
         maxrank == 0 && Int(round(length(lm.τ)*length(lm.σ)/(length(lm.τ)+length(lm.σ))))
@@ -547,13 +466,9 @@ function getcompressedmatrix(
 
         mbl = MatrixBlock{I, K, LowRankMatrix{K}}(
             LowRankMatrix(U, V),
-            indices(testnode),
-            indices(sourcenode)
+            testidcs,
+            trialidcs
         )
 
     return mbl
 end
-
-##
-
-real(ComplexF64)
