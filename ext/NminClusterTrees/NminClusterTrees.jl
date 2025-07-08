@@ -6,4 +6,6 @@ import ClusterTrees.BlockTrees: BlockTree
 
 include("nmintree.jl")
 
+export NminTree
+
 end

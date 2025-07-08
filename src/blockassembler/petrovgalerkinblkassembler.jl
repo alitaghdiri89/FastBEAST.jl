@@ -1,49 +1,38 @@
 using ClusterTrees
+using BlockSparseMatrices
 using ThreadsX
 
 function assemble(
     op::BEAST.AbstractOperator,
-    testspace::BEAST.Space,
-    trialspace::BEAST.Space,
+    testspace::BEAST.AbstractSpace,
+    trialspace::BEAST.AbstractSpace,
     tree::ClusterTrees.BlockTrees.BlockTree{T},
-    interactions::Vector{Tuple{I, I}},
+    nears::Vector{Tuple{I,I}},
     ::Type{K};
     quadstrat=BEAST.defaultquadstrat(op, testspace, trialspace),
-    multithreading=true
+    multithreading=true,
 ) where {I,K,T}
-
     @views nearblkassembler = BEAST.blockassembler(
-        op, testspace, trialspace, quadstrat=quadstrat
+        op, testspace, trialspace; quadstrat=quadstrat
     )
     @views function nearassembler(Z, tdata, sdata)
-        @views store(v,m,n) = (Z[m,n] += v)
-        nearblkassembler(tdata,sdata,store)
-    end
-
-    snears = Tuple{Int, Vector{Int}}[]
-    for near in interactions
-        if length(snears)!= 0 && snears[end][1] == near[1] 
-            push!(snears[end][2], near[2])
-        else
-            push!(snears, (near[1], [near[2]]))
-        end
+        @views store(v, m, n) = (Z[m, n] += v)
+        return nearblkassembler(tdata, sdata, store)
     end
 
     _foreach = multithreading ? ThreadsX.foreach : Base.foreach
-    blocks = Vector{BlockSparseMatrices.DenseMatrixBlock{K, Matrix{K}, Vector{I}}}(
-        undef, length(snears)
+    blocks = Vector{BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{I}}}(
+        undef, length(nears)
     )
-   
-    _foreach(enumerate(snears)) do (idx, snear) 
-        testidcs = value(tree.test_cluster, snear[1])
-        trialidcs = value(tree.trial_cluster, snear[2])
-        matrix = zeros(K, length(testidcs), length(trialidcs))
-        assembler(matrix, testidcs, trialidcs)
 
-        blocks[idx] =  BlockSparseMatrices.DenseMatrixBlock{K, Matrix{K}, Vector{Int}}(
-            matrix,
-            testidcs,
-            trialidcs
+    _foreach(enumerate(nears)) do (idx, near)
+        testidcs = value(tree.test_cluster, near[1])
+        trialidcs = value(tree.trial_cluster, near[2])
+        matrix = zeros(K, length(testidcs), length(trialidcs))
+        nearassembler(matrix, testidcs, trialidcs)
+
+        return blocks[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
+            matrix, testidcs, trialidcs
         )
     end
 
