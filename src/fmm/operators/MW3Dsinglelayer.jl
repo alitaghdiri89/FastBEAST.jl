@@ -4,20 +4,20 @@ using LinearAlgebra
 using LinearMaps
 using SparseArrays
 
-struct FMMMatrixMWSL{I, F <: Real, K} <: LinearMaps.LinearMap{K}
+struct FMMMatrixMWSL{I,F<:Real,K} <: LinearMaps.LinearMap{K}
     fmm::ExaFMMt.ExaFMM{K}
     fmm_t::ExaFMMt.ExaFMM{K}
     op::BEAST.MWSingleLayer3D
-    B1::SparseMatrixCSC{F, I}
-    B2::SparseMatrixCSC{F, I}
-    B3::SparseMatrixCSC{F, I}
-    Bdiv::SparseMatrixCSC{F, I}
-    B1_test::SparseMatrixCSC{F, I}
-    B2_test::SparseMatrixCSC{F, I}
-    B3_test::SparseMatrixCSC{F, I}
-    Bdiv_test::SparseMatrixCSC{F, I}
-    BtCB::HMatrix{I, K}
-    fullmat::HMatrix{I, K}
+    B1::SparseMatrixCSC{F,I}
+    B2::SparseMatrixCSC{F,I}
+    B3::SparseMatrixCSC{F,I}
+    Bdiv::SparseMatrixCSC{F,I}
+    B1_test::SparseMatrixCSC{F,I}
+    B2_test::SparseMatrixCSC{F,I}
+    B3_test::SparseMatrixCSC{F,I}
+    Bdiv_test::SparseMatrixCSC{F,I}
+    BtCB::AbstractBlockMatrix{K}
+    fullmat::AbstractBlockMatrix{K}
     rowdim::I
     columndim::I
 end
@@ -56,24 +56,23 @@ end=#
     end
     fill!(y, zero(eltype(y)))
 
-    res1 = A.B1_test * (A.fmm * (A.B1 * x))[:,1]
-    res2 = A.B2_test * (A.fmm * (A.B2 * x))[:,1]
-    res3 = A.B3_test * (A.fmm * (A.B3 * x))[:,1]
+    res1 = A.B1_test * (A.fmm * (A.B1 * x))[:, 1]
+    res2 = A.B2_test * (A.fmm * (A.B2 * x))[:, 1]
+    res3 = A.B3_test * (A.fmm * (A.B3 * x))[:, 1]
 
     y1 = (A.op.α .* (res1 + res2 + res3))
 
-    y2 = - (A.op.β) .*
-        (A.Bdiv_test * (A.fmm * (A.Bdiv * x))[:,1])
+    y2 = -(A.op.β) .* (A.Bdiv_test * (A.fmm * (A.Bdiv * x))[:, 1])
 
-    y.= (y1 - y2) - A.BtCB * x + A.fullmat * x
-    
+    y .= (y1 - y2) - A.BtCB * x + A.fullmat * x
+
     return y
 end
 
 @views function LinearAlgebra.mul!(
     y::AbstractVecOrMat,
     At::LinearMaps.TransposeMap{<:Any,<:FMMMatrixMWSL},
-    x::AbstractVector
+    x::AbstractVector,
 )
     LinearMaps.check_dim_mul(y, At, x)
 
@@ -83,25 +82,22 @@ end
     end
     fill!(y, zero(eltype(y)))
 
-    res1 = transpose(A.B1) * (A.fmm_t * (transpose(A.B1_test) * x))[:,1]
-    res2 = transpose(A.B2) * (A.fmm_t * (transpose(A.B2_test) * x))[:,1]
-    res3 = transpose(A.B3) * (A.fmm_t * (transpose(A.B3_test) * x))[:,1]
+    res1 = transpose(A.B1) * (A.fmm_t * (transpose(A.B1_test) * x))[:, 1]
+    res2 = transpose(A.B2) * (A.fmm_t * (transpose(A.B2_test) * x))[:, 1]
+    res3 = transpose(A.B3) * (A.fmm_t * (transpose(A.B3_test) * x))[:, 1]
 
     y1 = (A.op.α .* (res1 + res2 + res3))
 
-    y2 = - (A.op.β) .* (transpose(A.Bdiv) * (A.fmm_t * (transpose(A.Bdiv_test) * x))[:,1])
+    y2 = -(A.op.β) .* (transpose(A.Bdiv) * (A.fmm_t * (transpose(A.Bdiv_test) * x))[:, 1])
 
-    y.= (y1 - y2) - transpose(A.BtCB) * x + transpose(A.fullmat) * x
+    y .= (y1 - y2) - transpose(A.BtCB) * x + transpose(A.fullmat) * x
 
     return y
 end
 
 @views function LinearAlgebra.mul!(
-    y::AbstractVecOrMat,
-    At::LinearMaps.AdjointMap{<:Any,<:FMMMatrixMWSL},
-    x::AbstractVector
+    y::AbstractVecOrMat, At::LinearMaps.AdjointMap{<:Any,<:FMMMatrixMWSL}, x::AbstractVector
 )
-
     mul!(y, transpose(adjoint(At)), conj(x))
 
     return conj!(y)
@@ -109,23 +105,18 @@ end
 
 function FMMMatrix(
     op::BEAST.MWSingleLayer3D,
-    test_functions::BEAST.Space, 
-    trial_functions::BEAST.Space, 
+    test_functions::BEAST.Space,
+    trial_functions::BEAST.Space,
     testqp::Matrix,
     trialqp::Matrix,
     fmm::ExaFMMt.ExaFMM{K},
     fmm_t::ExaFMMt.ExaFMM{K},
-    BtCB::HMatrix{I, K},
-    fullmat::HMatrix{I, K},
-) where {I, K}
-
+    BtCB::AbstractBlockMatrix{K},
+    fullmat::AbstractBlockMatrix{K},
+) where {K}
     B1, B2, B3, Bdiv, B1_test, B2_test, B3_test, Bdiv_test = sample_basisfunctions(
-        op,
-        test_functions, 
-        trial_functions, 
-        testqp,
-        trialqp,
-    )    
+        op, test_functions, trial_functions, testqp, trialqp
+    )
 
     return FMMMatrixMWSL(
         fmm,
@@ -142,14 +133,14 @@ function FMMMatrix(
         BtCB,
         fullmat,
         size(fullmat)[1],
-        size(fullmat)[2]
+        size(fullmat)[2],
     )
 end
 
 function sample_basisfunctions(
-    op::BEAST.MWSingleLayer3D, 
-    test_functions::BEAST.Space, 
-    trial_functions::BEAST.Space, 
+    op::BEAST.MWSingleLayer3D,
+    test_functions::BEAST.Space,
+    trial_functions::BEAST.Space,
     testqp::Matrix,
     trialqp::Matrix,
 )
@@ -164,7 +155,7 @@ function sample_basisfunctions(
     Bdiv_test = Bdiv
 
     if test_functions != trial_functions
-        rc_test,  vals_test = sample_basisfunctions(op, testqp, test_functions)
+        rc_test, vals_test = sample_basisfunctions(op, testqp, test_functions)
         B1_test = dropzeros(sparse(rc_test[:, 2], rc_test[:, 1], vals_test[:, 1]))
         B2_test = dropzeros(sparse(rc_test[:, 2], rc_test[:, 1], vals_test[:, 2]))
         B3_test = dropzeros(sparse(rc_test[:, 2], rc_test[:, 1], vals_test[:, 3]))
@@ -173,7 +164,7 @@ function sample_basisfunctions(
     else
         B1_test = sparse(transpose(B1_test))
         B2_test = sparse(transpose(B2_test))
-        B3_test = sparse(transpose(B3_test)) 
+        B3_test = sparse(transpose(B3_test))
         Bdiv_test = sparse(transpose(Bdiv_test))
     end
 
