@@ -18,7 +18,7 @@ function assemble(
     end
 
     nears = sort(interactions)
-    snears = Tuple{Int,Vector{Int}}[]
+    snears = Tuple{Int,Int}[]
     selfs = Tuple{Int,Int}[]
     for near in nears
         if near[1] == near[2]
@@ -42,7 +42,7 @@ function assemble(
         matrix = zeros(K, length(testidcs), length(trialidcs))
         nearassembler(matrix, testidcs, trialidcs)
 
-        blocks[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
+        return blocks[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
             matrix, testidcs, trialidcs
         )
     end
@@ -53,7 +53,9 @@ function assemble(
         matrix = zeros(K, length(testidcs), length(trialidcs))
         nearassembler(matrix, testidcs, trialidcs)
 
-        diagonals[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
+        return diagonals[idx] = BlockSparseMatrices.DenseMatrixBlock{
+            K,Matrix{K},Vector{Int}
+        }(
             matrix, testidcs, trialidcs
         )
     end

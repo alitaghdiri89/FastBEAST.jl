@@ -11,12 +11,11 @@ function MaxPivoting()
 end
 
 function maxvalue(
-    roworcolumn::Vector{K}, 
-    usedidcs::Union{Vector{Bool}, SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}}
-) where K
-    
+    roworcolumn::Vector{K},
+    usedidcs::Union{Vector{Bool},SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true}},
+) where {K}
     idx = argmax(roworcolumn .* (.!usedidcs))
-    (!usedidcs[idx]) && return idx 
+    (!usedidcs[idx]) && return idx
     usedidcs[idx] && return argmin(usedidcs)
 end
 
@@ -27,36 +26,34 @@ end
 function pivoting(
     pivstrat::MaxPivoting,
     roworcolumn::Vector{K},
-    usedidcs::Union{Vector{Bool}, SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}},
-    convcrit::ConvergenceCriterion
-) where K
-
+    usedidcs::Union{Vector{Bool},SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true}},
+    convcrit::ConvergenceCriterion,
+) where {K}
     return maxvalue(roworcolumn, usedidcs)
 end
 
 # Fill-distance pivoting
 abstract type FD <: PivStrat end
-struct FillDistance{F <: Real} <: FD
+struct FillDistance{F<:Real} <: FD
     h::Vector{F}
-    pos::Vector{SVector{3, F}}
+    pos::Vector{SVector{3,F}}
 end
 
-function FillDistance(pos::Vector{SVector{3, F}}) where F <: Real
+function FillDistance(pos::Vector{SVector{3,F}}) where {F<:Real}
     return FillDistance(zeros(F, length(pos)), pos)
 end
 
 function filldistance(
     fdmemory::FillDistance{F},
-    usedidcs::Union{Vector{Bool}, SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}},
-) where F <: Real
-
+    usedidcs::Union{Vector{Bool},SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true}},
+) where {F<:Real}
     pivots = Int[]
     maxval = maximum(fdmemory.h)
 
     for k in eachindex(fdmemory.h)
         newfd = 0.0
         for (ind, pos) in enumerate(fdmemory.pos)
-            if fdmemory.h[ind] > norm(fdmemory.pos[k] - pos) 
+            if fdmemory.h[ind] > norm(fdmemory.pos[k] - pos)
                 if newfd < norm(fdmemory.pos[k] - pos)
                     newfd = norm(fdmemory.pos[k] - pos)
                 end
@@ -70,7 +67,7 @@ function filldistance(
             if newfd < maxval
                 maxval = newfd
                 pivots = Int[k]
-            elseif newfd == maxval 
+            elseif newfd == maxval
                 push!(pivots, k)
             end
         end
@@ -79,25 +76,23 @@ function filldistance(
     return pivots
 end
 
-struct ModifiedFillDistance{F <: Real} <: FD
+struct ModifiedFillDistance{F<:Real} <: FD
     h::Vector{F}
-    pos::Vector{SVector{3, F}}
+    pos::Vector{SVector{3,F}}
 end
 
-function ModifiedFillDistance(pos::Vector{SVector{3, F}}) where F <: Real
+function ModifiedFillDistance(pos::Vector{SVector{3,F}}) where {F<:Real}
     return ModifiedFillDistance(zeros(F, length(pos)), pos)
 end
 
 function filldistance(
     fdmemory::ModifiedFillDistance{F},
-    usedidcs::Union{Vector{Bool}, SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}},
-) where F <: Real
-
+    usedidcs::Union{Vector{Bool},SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true}},
+) where {F<:Real}
     return [argmax(fdmemory.h)]
 end
 
 function update_filldistance!(fdmemory::FD, pivotidx::Int)
-
     for k in eachindex(fdmemory.h)
         if fdmemory.h[k] > norm(fdmemory.pos[k] - fdmemory.pos[pivotidx])
             fdmemory.h[k] = norm(fdmemory.pos[k] - fdmemory.pos[pivotidx])
@@ -105,20 +100,19 @@ function update_filldistance!(fdmemory::FD, pivotidx::Int)
     end
 end
 
-""" 
+"""
     function firstpivot(pivstrat::FD, globalidcs::Vector{Int})
 
-Returns first index of the pivoting strategy. For `FillDistance` this will be the 
+Returns first index of the pivoting strategy. For `FillDistance` this will be the
 basis function closest to the center of the distribution.
 
-# Arguments 
-- `pivstrat::FD`: Pivoting strategy.
-- `globalidcs::Vector{Int}`: Indices corresponding to the matrix block, used to determine the
-basis functions/positions used for pivoting.
+# Arguments
 
+  - `pivstrat::FD`: Pivoting strategy.
+  - `globalidcs::Vector{Int}`: Indices corresponding to the matrix block, used to determine the
+    basis functions/positions used for pivoting.
 """
 function firstpivot(pivstrat::FD, globalidcs::Vector{Int})
-
     localpos = pivstrat.pos[globalidcs]
     center = sum(localpos) / length(localpos)
 
@@ -135,13 +129,12 @@ function firstpivot(pivstrat::FD, globalidcs::Vector{Int})
     for i in eachindex(h)
         h[i] = norm(localpos[i] - localpos[firstidcs])
     end
-    
+
     pivstrat isa FillDistance && return FillDistance(h, localpos), firstidcs
     pivstrat isa ModifiedFillDistance && return ModifiedFillDistance(h, localpos), firstidcs
 end
 
-
-""" 
+"""
     function pivoting(
         pivstrat::FD,
         roworcolumn::Vector{K},
@@ -151,59 +144,54 @@ end
 
 Returns next row or column used for approximation.
 
-# Arguments 
-- `pivstrat::FD`: Pivoting strategy. 
-- `roworcolumn::Vector{K}`: Last row or column.
-- `usedidcs::SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}`: Already used
-indices. Rows/colums can be used only once.
-- `convcrit::ConvergenceCriterion`: Convergence criterion used only in the case of MRFPivoting
+# Arguments
 
+  - `pivstrat::FD`: Pivoting strategy.
+  - `roworcolumn::Vector{K}`: Last row or column.
+  - `usedidcs::SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true}`: Already used
+    indices. Rows/colums can be used only once.
+  - `convcrit::ConvergenceCriterion`: Convergence criterion used only in the case of MRFPivoting
 """
 function pivoting(
     pivstrat::FD,
     roworcolumn::Vector{K},
-    usedidcs::SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true},
-    convcrit::ConvergenceCriterion
+    usedidcs::Union{SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true},Vector{Bool}},
+    convcrit::ConvergenceCriterion,
 ) where {K}
-    
     nextpivots::Vector{Int} = filldistance(pivstrat, usedidcs)
     nextpivot = nextpivots[1]
-    @views length(nextpivots) > 1 && (
-        nextpivot = nextpivots[argmax(roworcolumn[nextpivots])]
-    )
+    @views length(nextpivots) > 1 &&
+        (nextpivot = nextpivots[argmax(roworcolumn[nextpivots])])
     update_filldistance!(pivstrat, nextpivot)
-    
+
     return nextpivot
 end
 
 # EnforcedPivoting
-mutable struct EnforcedPivoting{I, F} <: PivStrat
+mutable struct EnforcedPivoting{I,F} <: PivStrat
     firstindex::Int
-    pos::Vector{SVector{I, F}}
+    pos::Vector{SVector{I,F}}
     sc::Bool
     rc::Bool
     geostep::Bool
 end
 
-function EnforcedPivoting(pos::Vector{SVector{I, F}}; firstpivot=1) where {I, F}
-
+function EnforcedPivoting(pos::Vector{SVector{I,F}}; firstpivot=1) where {I,F}
     return EnforcedPivoting(firstpivot, pos, false, false, false)
 end
 
-function firstpivot(pivstrat::EnforcedPivoting{3, F}, globalidcs::Vector{Int}) where F
-    return EnforcedPivoting(
-        1, pivstrat.pos[globalidcs], false, false, false
-    ), pivstrat.firstindex
+function firstpivot(pivstrat::EnforcedPivoting{3,F}, globalidcs::Vector{Int}) where {F}
+    return EnforcedPivoting(1, pivstrat.pos[globalidcs], false, false, false),
+    pivstrat.firstindex
 end
 
 function pivoting(
-    pivstrat::EnforcedPivoting{3, F},
+    pivstrat::EnforcedPivoting{3,F},
     roworcolumn::Vector{K},
-    usedidcs::SubArray{Bool, 1, Vector{Bool}, Tuple{UnitRange{Int}}, true},
+    usedidcs::SubArray{Bool,1,Vector{Bool},Tuple{UnitRange{Int}},true},
     # ToDo: Perhaps structs of Pivoting and Converegence must be declarded in aca_utils.jl
-    convcrit::ConvergenceCriterion#Combined{I, F, K} 
-) where {F, K}
-
+    convcrit::ConvergenceCriterion,#Combined{I, F, K} 
+) where {F,K}
     localind = 1
     if pivstrat.sc && pivstrat.rc && pivstrat.geostep
         println("You should not be here.")
@@ -220,9 +208,9 @@ function pivoting(
         localind = argmin(usedidcs)
         maxval = 0.0
         for (lind, p) in enumerate(pivstrat.pos)
-            val = abs(dot((p - mp), u[:, 3])) 
+            val = abs(dot((p - mp), u[:, 3]))
             if maxval < val && !usedidcs[lind]
-                maxval = val 
+                maxval = val
                 localind = lind
             end
         end
@@ -234,4 +222,3 @@ function pivoting(
 
     return localind
 end
-

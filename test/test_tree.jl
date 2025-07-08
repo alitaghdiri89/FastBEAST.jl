@@ -12,17 +12,23 @@ nears, fars = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree))
 ##
 
 # KMeansTree
-points = [@SVector rand(3) for i = 1:1000]
+points = [@SVector rand(3) for i in 1:1000]
 
-tree = create_tree(points, FastBEAST.KMeansTreeOptions(nmin=5))
-nears_strong, fars_strong = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=1.0)
-nears_weak, fars_weak = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=2.0)
+tree = create_tree(points, FastBEAST.KMeansTreeOptions(; nmin=5))
+nears_strong, fars_strong = computeinteractions(
+    ClusterTrees.BlockTrees.BlockTree(tree, tree); η=1.0
+)
+nears_weak, fars_weak = computeinteractions(
+    ClusterTrees.BlockTrees.BlockTree(tree, tree); η=2.0
+)
 
 @test length(fars_weak[6]) > length(fars_strong[6])
 
-tree = create_tree(points, FastBEAST.BoxTreeOptions(nmin=5))
-nears_strong, fars_strong = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=1.0)
-nears_weak, fars_weak = computeinteractions(ClusterTrees.BlockTrees.BlockTree(tree, tree), η=2.0)
+tree = create_tree(points, FastBEAST.BoxTreeOptions(; nmin=5))
+nears_strong, fars_strong = computeinteractions(
+    ClusterTrees.BlockTrees.BlockTree(tree, tree); η=1.0
+)
+nears_weak, fars_weak = computeinteractions(
+    ClusterTrees.BlockTrees.BlockTree(tree, tree); η=2.0
+)
 @test length(fars_weak[3]) > length(fars_strong[3])
-
-

@@ -31,7 +31,7 @@ function assemble(
         matrix = zeros(K, length(testidcs), length(trialidcs))
         nearassembler(matrix, testidcs, trialidcs)
 
-        blocks[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
+        return blocks[idx] = BlockSparseMatrices.DenseMatrixBlock{K,Matrix{K},Vector{Int}}(
             matrix, testidcs, trialidcs
         )
     end
