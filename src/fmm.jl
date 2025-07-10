@@ -126,18 +126,11 @@ function getfullrankblocks(
     correctionblocks = MBF[]
     correctionblocks_perthread = Vector{MBF}[]
 
-    test_tree = create_tree(test_functions.pos, treeoptions)
-    trial_tree = create_tree(trial_functions.pos, treeoptions)
-
-    fullinteractions = SVector{2}[]
-    compressableinteractions = SVector{2}[]
-
-    FastBEAST.computerinteractions!(
-        test_tree,
-        trial_tree,
-        fullinteractions,
-        compressableinteractions
+    tree = ClusterTrees.BlockTrees.BlockTree(
+        create_tree(test_functions.pos, treeoptions),
+        create_tree(trial_functions.pos, treeoptions)
     )
+    fullinteractions, compressableinteractions = computeinteractions(tree)
 
     if !multithreading
         for fullinteraction in fullinteractions
@@ -145,8 +138,8 @@ function getfullrankblocks(
                 fullrankblocks,
                 FastBEAST.getfullmatrixview(
                     assembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     Int,
                     scalartype(operator)
                 )
@@ -155,8 +148,8 @@ function getfullrankblocks(
                 correctionblocks,
                 FastBEAST.getfullmatrixview(
                     corassembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     Int,
                     scalartype(operator)
                 )
@@ -173,8 +166,8 @@ function getfullrankblocks(
                 fullrankblocks_perthread[Threads.threadid()],
                 FastBEAST.getfullmatrixview(
                     assembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     Int,
                     scalartype(operator)
                 )
@@ -183,8 +176,8 @@ function getfullrankblocks(
                 correctionblocks_perthread[Threads.threadid()],
                 FastBEAST.getfullmatrixview(
                     corassembler,
-                    fullinteraction[1],
-                    fullinteraction[2],
+                    value(tree.test_cluster, fullinteraction[1]),
+                    value(tree.trial_cluster, fullinteraction[2]),
                     Int,
                     scalartype(operator)
                 )

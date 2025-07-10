@@ -9,7 +9,8 @@ function hassemble(
     quadstratcbk=BEAST.defaultquadstrat(operator, test_functions, trial_functions),
     quadstratfbk=BEAST.defaultquadstrat(operator, test_functions, trial_functions),
     multithreading=false,
-    verbose=false
+    verbose=false,
+    η=1.5
 )
 
     @views blkasm = BEAST.blockassembler(
@@ -18,7 +19,6 @@ function hassemble(
         trial_functions,
         quadstrat=quadstratfbk
     )
-    
     @views function assembler(Z, tdata, sdata)
         @views store(v,m,n) = (Z[m,n] += v)
         blkasm(tdata,sdata,store)
@@ -30,26 +30,24 @@ function hassemble(
         trial_functions,
         quadstrat=quadstratcbk
     )
-    
     @views function farassembler(Z, tdata, sdata)
         @views store(v,m,n) = (Z[m,n] += v)
         farblkasm(tdata,sdata,store)
     end
-
 
     test_tree = create_tree(test_functions.pos, treeoptions)
     trial_tree = create_tree(trial_functions.pos, treeoptions)
 
     @time hmat = HMatrix(
         assembler,
-        test_tree,
-        trial_tree,
+        ClusterTrees.BlockTrees.BlockTree(test_tree, trial_tree),
         Int64,
         scalartype(operator),
         farmatrixassembler=farassembler,
         compressor=compressor,
         multithreading=multithreading,
-        verbose=verbose
+        verbose=verbose,
+        η=η
     )
     return hmat
 end
@@ -94,7 +92,7 @@ function fmmassemble(
         0,
         multithreading
     )
-    
+
     testpoints, testqp = meshtopoints(test_functions, quadstratcbk.outer_rule)
     trialpoints, trialqp = meshtopoints(trial_functions, quadstratcbk.outer_rule)
 
@@ -107,8 +105,8 @@ function fmmassemble(
 
     return FMMMatrix(
         operator,
-        test_functions, 
-        trial_functions, 
+        test_functions,
+        trial_functions,
         testqp,
         trialqp,
         fmm,
@@ -197,7 +195,7 @@ struct SafeDoubleQuadRule{P,Q}
     inner_quad_points::Q
 end
 
-function BEAST.quadrule(op, tref, bref, i ,τ, j, σ, qd, qs::SafeDoubleNumQStrat)
+function BEAST.quadrule(op, tref, bref, i, τ, j, σ, qd, qs::SafeDoubleNumQStrat)
     return SafeDoubleQuadRule(
         qd.tpoints[1,i],
         qd.bpoints[1,j])
@@ -212,10 +210,10 @@ function BEAST.quaddata(
     qs::SafeDoubleNumQStrat
 )
 
-    test_eval(x)  = test_refspace(x)
+    test_eval(x) = test_refspace(x)
     trial_eval(x) = trial_refspace(x)
 
-    tpoints = BEAST.quadpoints(test_eval,  test_elements,  (qs.outer_rule,))
+    tpoints = BEAST.quadpoints(test_eval, test_elements, (qs.outer_rule,))
     bpoints = BEAST.quadpoints(trial_eval, trial_elements, (qs.inner_rule,))
 
     return (;tpoints, bpoints)
@@ -230,27 +228,25 @@ function BEAST.quaddata(
     qs::SafeDoubleNumQStrat
 )
 
-    test_eval(x)  = test_refspace(x)
+    test_eval(x) = test_refspace(x)
     trial_eval(x) = trial_refspace(x)
 
-    tpoints = BEAST.quadpoints(test_eval,  test_elements,  (qs.outer_rule,))
+    tpoints = BEAST.quadpoints(test_eval, test_elements, (qs.outer_rule,))
     bpoints = BEAST.quadpoints(trial_eval, trial_elements, (qs.inner_rule,))
 
     return (;tpoints, bpoints)
 end
 
 function BEAST.momintegrals!(biop, tshs, bshs, tcell, bcell, z, strat::SafeDoubleQuadRule)
-    
+
     igd = BEAST.Integrand(biop, tshs, bshs, tcell, bcell)
     womps = strat.outer_quad_points
     wimps = strat.inner_quad_points
-    
     for womp in womps
         tgeo = womp.point
         tvals = womp.value
         M = length(tvals)
         jx = womp.weight
-        
         for wimp in wimps
             bgeo = wimp.point
             bvals = wimp.value
@@ -263,8 +259,10 @@ function BEAST.momintegrals!(biop, tshs, bshs, tcell, bcell, z, strat::SafeDoubl
                 z1 = j * igd(tgeo, bgeo, tvals, bvals)
                 for n in 1:N
                     for m in 1:M
-                        z[m,n] += z1[m,n]
-            end end end
+                        z[m, n] += z1[m, n]
+                    end
+                end
+            end
         end
     end
 
