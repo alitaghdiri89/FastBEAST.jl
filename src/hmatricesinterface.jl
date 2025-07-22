@@ -1,11 +1,11 @@
-using BEAST
+#=using BEAST
 using CompScienceMeshes
 using HMatrices
 using LinearAlgebra
 using StaticArrays
 using Plots
 using DataStructures
-
+=#
 struct InterfaceAbstractMatrix <:AbstractMatrix{Float64}
     operator::BEAST.HH3DSingleLayerFDBIO
     spaceA::BEAST.LagrangeBasis
@@ -147,6 +147,7 @@ dim = length(spaceX.pos)
 
 @time A = assemble(op, spaceX, spaceX)
 @time hmat = interface_to_hmatrix(op, spaceX, spaceX)
+get_hmatrix_memory_size(hmat)
 ##
 hmat
 ##
@@ -419,3 +420,9 @@ ylabel!("relative error")
 png("err_vs_tol_myaca")
 
 ##
+function m2(; kwargs...)
+            println(kwargs)
+            x = haskey(kwargs, :a) ? kwargs[:a] : 0
+            println(x)
+end
+m2(;b = 10)
