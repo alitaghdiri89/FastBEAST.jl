@@ -1,10 +1,12 @@
-#=using BEAST
-using CompScienceMeshes
+using BEAST
 using HMatrices
+using CompScienceMeshes
+using DataStructures
+
+#=
 using LinearAlgebra
 using StaticArrays
 using Plots
-using DataStructures
 =#
 struct InterfaceAbstractMatrix <:AbstractMatrix{Float64}
     operator::BEAST.HH3DSingleLayerFDBIO
@@ -97,7 +99,7 @@ function interface_to_hmatrix(operator, spaceA, spaceB; rtol=1e-6, splitter_nmax
     h_matrix = assemble_hmatrix(abstract_matrix, Xclt, Yclt, comp=comp, threads =false)
     return h_matrix 
 end
-
+##
 struct LeafBlock <:AbstractMatrix{Float64}
     fullMat :: InterfaceAbstractMatrix
     irange :: Vector{Int64}

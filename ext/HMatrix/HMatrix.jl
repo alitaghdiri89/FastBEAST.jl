@@ -1,4 +1,5 @@
-module H
+module ℌ
+
     include("HMatrices.jl")
     include("ACAFact.jl")
     include("AdaptiveCrossApproximation.jl")  

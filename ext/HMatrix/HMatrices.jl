@@ -1,10 +1,6 @@
 using BEAST
-using CompScienceMeshes
 using HMatrices
-#=using LinearAlgebra
-using StaticArrays
-using Plots
-using DataStructures=#
+using DataStructures
 
 struct InterfaceAbstractMatrix <:AbstractMatrix{Float64}
     operator::BEAST.HH3DSingleLayerFDBIO
