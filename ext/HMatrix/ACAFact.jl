@@ -23,11 +23,11 @@ Base.@kwdef struct ACAFactWrapper
 end
 
 
-function (paca::ACAFactWrapper)(K, rowtree::ClusterTree, coltree::ClusterTree, bufs = nothing)
+function (wrapper::ACAFactWrapper)(K, rowtree::ClusterTree, coltree::ClusterTree, bufs = nothing)
     irange = HMatrices.index_range(rowtree)
     jrange = HMatrices.index_range(coltree)
     leaf = LeafBlock(K, irange, jrange)
-    (U, V) = aca(leaf, paca.rtol)
+    (U, V) = aca(leaf, wrapper.rtol)
     return HMatrices.RkMatrix(U, V)
 end
 

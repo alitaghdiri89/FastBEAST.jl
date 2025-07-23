@@ -3,11 +3,11 @@ using HMatrices
 using CompScienceMeshes
 using DataStructures
 
-#=
+
 using LinearAlgebra
 using StaticArrays
 using Plots
-=#
+
 struct InterfaceAbstractMatrix <:AbstractMatrix{Float64}
     operator::BEAST.HH3DSingleLayerFDBIO
     spaceA::BEAST.LagrangeBasis
@@ -398,7 +398,7 @@ powers = collect(-4:-1:-10)
 rtols = [10.0^i for i in powers]
 rel_errors = zeros(Float64, size(rtols))
 
-Γ = meshsphere(1.0, 0.025) 
+Γ = meshsphere(1.0, 0.025)
 op = Helmholtz3D.singlelayer()
 spaceX = lagrangecxd0(Γ)
 dim = length(spaceX.pos)

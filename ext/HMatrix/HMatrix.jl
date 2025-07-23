@@ -4,6 +4,7 @@ module ℌ
     include("ACAFact.jl")
     include("AdaptiveCrossApproximation.jl")  
     
-    #=export assemble
-    get_hmatrix_memory_size=#
+    export assemble
+    export get_hmatrix_memory_size
+    export ACAFactWrapper
 end

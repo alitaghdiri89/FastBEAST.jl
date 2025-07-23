@@ -55,13 +55,13 @@ end
 
 
 function assemble(op, spaceA, spaceB;  kwargs...)
-    abstract_matrix = InterfaceAbstractMatrix(operator, spaceA, spaceB)
+    abstract_matrix = InterfaceAbstractMatrix(op, spaceA, spaceB)
     splitter_nmax = haskey(kwargs, :splitter_nmax) ? kwargs[:splitter_nmax] : 50
     Xclt = ClusterTree(spaceA.pos, HMatrices.GeometricSplitter(splitter_nmax))
     Yclt = ClusterTree(spaceB.pos, HMatrices.GeometricSplitter(splitter_nmax))
     rtol = haskey(kwargs, :rtol) ? kwargs[:rtol] : 1e-4
     comp = haskey(kwargs, :comp) ? kwargs[:comp] : PartialACA(; rtol=rtol)
-    hmatrix = assemble_hmatrix(abstract_matrix, Xclt, Yclt, comp=comp, Threads=false)
+    hmatrix = assemble_hmatrix(abstract_matrix, Xclt, Yclt; comp=comp)
     return hmatrix
 end
 
