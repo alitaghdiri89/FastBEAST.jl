@@ -7,4 +7,5 @@ module ℌ
     export assemble
     export get_hmatrix_memory_size
     export ACAFactWrapper
+    export AdaptiveCrossApproximationWrapper
 end

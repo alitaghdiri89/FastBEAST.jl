@@ -27,7 +27,7 @@ function (wrapper::ACAFactWrapper)(K, rowtree::ClusterTree, coltree::ClusterTree
     irange = HMatrices.index_range(rowtree)
     jrange = HMatrices.index_range(coltree)
     leaf = LeafBlock(K, irange, jrange)
-    (U, V) = aca(leaf, wrapper.rtol)
+    @time (U, V) = aca(leaf, wrapper.rtol)
     return HMatrices.RkMatrix(U, V)
 end
 
