@@ -2,6 +2,9 @@ using HMatrices
 using ACAFact
 
 struct LeafBlock <:AbstractMatrix{Float64}
+    """
+    A wrapper representing a single leaf in the Hmatrix tree
+    """
     fullMat :: InterfaceAbstractMatrix
     irange :: Vector{Int64}
     jrange :: Vector{Int64}
@@ -27,14 +30,20 @@ function (wrapper::ACAFactWrapper)(K, rowtree::ClusterTree, coltree::ClusterTree
     irange = HMatrices.index_range(rowtree)
     jrange = HMatrices.index_range(coltree)
     leaf = LeafBlock(K, irange, jrange)
-    @time (U, V) = aca(leaf, wrapper.rtol)
+    (U, V) = aca(leaf, wrapper.rtol)
     return HMatrices.RkMatrix(U, V)
 end
 
 function ACAFact.row!(buff, K::LeafBlock, i)
+    """
+    overloaded to use K.blockassembler instead of Base.getindex
+    """
     reshaped_buff = reshape(buff, (1, size(K, 2)))
     K.fullMat.blockassembler(reshaped_buff, [K.irange[i]], K.jrange)
 end
 function ACAFact.col!(buff, K::LeafBlock, j)
+    """
+    overloaded to use K.blockassembler instead of Base.getindex
+    """
     K.fullMat.blockassembler(buff, K.irange, [K.jrange[j]])
 end

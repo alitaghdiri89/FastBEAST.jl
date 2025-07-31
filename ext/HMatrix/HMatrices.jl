@@ -12,6 +12,10 @@ end
 function InterfaceAbstractMatrix(operator::BEAST.HH3DSingleLayerFDBIO, spaceA::BEAST.LagrangeBasis, spaceB::BEAST.LagrangeBasis)
     blkasm = BEAST.blockassembler(operator, spaceA, spaceB)    
     function blkassembler(Z, tdata, sdata)
+        """
+        Z is the buffer
+        tdata and sdata are respectively lists of indices of required rows and cols 
+        """
         fill!(Z, 0.0)
         @views store(v,m,n) = (Z[m,n] += v)
         blkasm(tdata,sdata,store)
@@ -20,29 +24,28 @@ function InterfaceAbstractMatrix(operator::BEAST.HH3DSingleLayerFDBIO, spaceA::B
 end
 
 function Base.getindex(K::InterfaceAbstractMatrix, i::Int, j::Int)
-    blkasm = BEAST.blockassembler(K.operator, K.spaceA, K.spaceB)    
-    function blkassembler(Z, tdata, sdata)
-        @views store(v,m,n) = (Z[m,n] += v)
-        blkasm(tdata,sdata,store)
-    end
-    blk = zeros(Float64, 1, 1)
-    blkassembler(blk, [i], [j])
+    blk = zeros(eltype(K), 1, 1)
+    K.blockassembler(blk, [i], [j])
     return blk[1, 1]
 end
 
 Base.size(K::InterfaceAbstractMatrix) = length(K.spaceA.pos), length(K.spaceB.pos)
+
 function HMatrices.getblock!(
-    out, K::HMatrices.PermutedMatrix{TT, T}#=InterfaceAbstractMatrix=#, irange_, jrange_
+    buf, K::HMatrices.PermutedMatrix{TT, T}, irange_, jrange_
  ) where {TT <: InterfaceAbstractMatrix, T}
-    irange = rangeConverter(irange_, K)
-    jrange = rangeConverter(jrange_, K)
+    """
+    overloaded to use K.blockassembler instead of Base.getindex
+    """
+    irange = range2vecConverter(irange_, K)
+    jrange = range2vecConverter(jrange_, K)
     permuted_irange = K.rowperm[Vector(irange)]
     permuted_jrange = K.colperm[Vector(jrange)]
-    K.data.blockassembler(out, permuted_irange, permuted_jrange)
-    return out
+    K.data.blockassembler(buf, permuted_irange, permuted_jrange)
+    return buf
 end
 
-function rangeConverter(range_, K)
+function range2vecConverter(range_, K)
     if range_ isa Colon
         range = axes(K, 1)
     elseif range_ isa Int
@@ -55,6 +58,15 @@ end
 
 
 function assemble(op, spaceA, spaceB;  kwargs...)
+    """
+    Optional kwargs can be:
+        - splitter_nmax {Int}: treshhold for ClusterTree split
+          Default: 50
+        - rtol {Float64}: relative tolerance for when using the default ACA compressor
+          Default: 1e-4
+        - comp : a callable ACA compressor object, if passed the rtol argument will be ignored
+          Default: Hmatrices.PartialACA(; rtol=rtol)
+    """
     abstract_matrix = InterfaceAbstractMatrix(op, spaceA, spaceB)
     splitter_nmax = haskey(kwargs, :splitter_nmax) ? kwargs[:splitter_nmax] : 50
     Xclt = ClusterTree(spaceA.pos, HMatrices.GeometricSplitter(splitter_nmax))
